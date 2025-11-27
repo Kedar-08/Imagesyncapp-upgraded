@@ -8,6 +8,7 @@ import {
   ActivityIndicator,
   Alert,
   RefreshControl,
+  ScrollView,
 } from "react-native";
 import type { StoredUser } from "../db/users";
 import type { AuthUser } from "../types";
@@ -16,6 +17,7 @@ import {
   ImageItem,
   PromotionItem,
   DeletionItem,
+  DeletedUserItem,
 } from "../components/UserProfileItems";
 import {
   userProfileStyles,
@@ -34,8 +36,15 @@ export default function UserProfileScreen({
   onBack,
   currentUser,
 }: UserProfileScreenProps) {
-  const { images, promotions, deletions, loading, refreshing, onRefresh } =
-    useUserProfile(user, currentUser || null);
+  const {
+    images,
+    promotions,
+    deletions,
+    deletedUsers,
+    loading,
+    refreshing,
+    onRefresh,
+  } = useUserProfile(user, currentUser || null);
   const [selectedImage, setSelectedImage] = useState<any>(null);
   const [showImageModal, setShowImageModal] = useState(false);
 
@@ -51,8 +60,10 @@ export default function UserProfileScreen({
   const isAdminUser = user.role !== "user";
   const canViewAdminActivity =
     currentUser &&
-    (currentUser.role === "superadmin" || currentUser.role === "admin") &&
-    user.role === "admin";
+    (currentUser.role === "superadmin" ||
+      (currentUser.role === "admin" && user.role === "superadmin") ||
+      (currentUser.role === "admin" && user.role === "admin")) &&
+    (user.role === "admin" || user.role === "superadmin");
 
   return (
     <View style={pStyles.container}>
@@ -121,49 +132,70 @@ export default function UserProfileScreen({
           )}
         </>
       ) : canViewAdminActivity ? (
-        <>
+        <ScrollView
+          contentContainerStyle={pStyles.listContent}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
+        >
           {promotions.length > 0 && (
             <>
               <View style={pStyles.imagesHeader}>
                 <Text style={pStyles.imagesTitle}>
-                  Promotions by this Admin
+                  Promotions by this{" "}
+                  {user.role === "superadmin" ? "SuperAdmin" : "Admin"}
                 </Text>
               </View>
-              <FlatList
-                data={promotions}
-                renderItem={({ item }) => <PromotionItem item={item} />}
-                keyExtractor={(item) => `promo-${item.id}`}
-                scrollEnabled={false}
-              />
+              {promotions.map((item) => (
+                <PromotionItem key={`promo-${item.id}`} item={item} />
+              ))}
             </>
           )}
           {deletions.length > 0 && (
             <>
               <View style={pStyles.imagesHeader}>
                 <Text style={pStyles.imagesTitle}>
-                  Images Deleted by this Admin
+                  Assets Deleted by this{" "}
+                  {user.role === "superadmin" ? "SuperAdmin" : "Admin"}
                 </Text>
               </View>
-              <FlatList
-                data={deletions}
-                renderItem={({ item }) => <DeletionItem item={item} />}
-                keyExtractor={(item) => `del-${item.id}`}
-                scrollEnabled={false}
-              />
+              {deletions.map((item) => (
+                <DeletionItem key={`del-${item.id}`} item={item} />
+              ))}
             </>
           )}
-          {promotions.length === 0 && deletions.length === 0 && (
-            <View style={pStyles.centerContainer}>
-              <Text style={pStyles.emptyText}>No admin activity recorded</Text>
-            </View>
+          {deletedUsers.length > 0 && (
+            <>
+              <View style={pStyles.imagesHeader}>
+                <Text style={pStyles.imagesTitle}>
+                  Users Removed by this{" "}
+                  {user.role === "superadmin" ? "SuperAdmin" : "Admin"}
+                </Text>
+              </View>
+              {deletedUsers.map((item) => (
+                <DeletedUserItem key={`deluser-${item.id}`} item={item} />
+              ))}
+            </>
           )}
-        </>
+          {promotions.length === 0 &&
+            deletions.length === 0 &&
+            deletedUsers.length === 0 && (
+              <View style={pStyles.centerContainer}>
+                <Text style={pStyles.emptyText}>
+                  No {user.role === "superadmin" ? "superadmin" : "admin"}{" "}
+                  activity recorded
+                </Text>
+              </View>
+            )}
+        </ScrollView>
       ) : (
         <View style={pStyles.centerContainer}>
           <Text style={pStyles.emptyText}>
             {user.role === "admin"
               ? "Admins cannot upload images"
-              : "Super Admin account"}
+              : user.role === "superadmin"
+                ? "SuperAdmins cannot upload images"
+                : "Admin account"}
           </Text>
         </View>
       )}

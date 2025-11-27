@@ -51,7 +51,7 @@ export default function CaptureHeader({
       {/* Header with user info and logout */}
       <View style={styles.headerContainer}>
         <View style={styles.userInfoContainer}>
-          <Text style={styles.userGreeting}>👤 {user?.name}</Text>
+          <Text style={styles.userGreeting}>{user?.name}</Text>
           <Text style={styles.userEmail}>{user?.email}</Text>
           <Text style={styles.userRole}>Role: {user?.role?.toUpperCase()}</Text>
         </View>
@@ -79,7 +79,7 @@ export default function CaptureHeader({
             ]}
             onPress={onPick}
           >
-            <Text style={buttonTextStyle()}>🖼️ Gallery</Text>
+            <Text style={buttonTextStyle()}>Gallery</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -87,9 +87,7 @@ export default function CaptureHeader({
       {(isAdmin || isSuperAdmin) && (
         <View>
           <View style={styles.adminButtonRow}>
-            <Text style={styles.adminModeText}>
-              📊 Admin Mode - View & Manage
-            </Text>
+            <Text style={styles.adminModeText}>Admin Mode - View & Manage</Text>
           </View>
           <View style={styles.adminMenuRow}>
             <TouchableOpacity
@@ -105,7 +103,7 @@ export default function CaptureHeader({
                   currentScreen === "users" && styles.adminButtonTextActive,
                 ]}
               >
-                👥 Users
+                Users
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -121,7 +119,7 @@ export default function CaptureHeader({
                   currentScreen === "assets" && styles.adminButtonTextActive,
                 ]}
               >
-                🖼️ Assets
+                Assets
               </Text>
             </TouchableOpacity>
           </View>

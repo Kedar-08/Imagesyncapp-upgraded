@@ -4,6 +4,7 @@ import type {
   AssetWithUser,
   AdminPromotion,
   DeletedAssetRecord,
+  DeletedUserRecord,
 } from "../db/db";
 import { formatDate } from "../utils/dateHelpers";
 import { listItemStyles } from "../utils/styleHelpers";
@@ -95,6 +96,33 @@ export function DeletionItem({ item }: DeletionItemProps) {
             Originally uploaded by {item.originalUploaderUsername}
           </Text>
         )}
+        <Text style={styles.actionDate}>
+          {formatDate(item.deletionTimestampMs)}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+interface DeletedUserItemProps {
+  item: DeletedUserRecord;
+}
+
+export function DeletedUserItem({ item }: DeletedUserItemProps) {
+  const styles = listItemStyles();
+  return (
+    <View style={styles.actionItem}>
+      <View style={[styles.actionIcon, styles.deleteIcon]}>
+        <Text style={styles.actionIconText}>X</Text>
+      </View>
+      <View style={styles.actionContent}>
+        <Text style={styles.actionTitle}>
+          Removed user{" "}
+          <Text style={styles.actionUsername}>{item.deletedUsername}</Text>
+        </Text>
+        <Text style={styles.actionSubtext}>
+          Email: {item.deletedEmail} • Role: {item.deletedRole}
+        </Text>
         <Text style={styles.actionDate}>
           {formatDate(item.deletionTimestampMs)}
         </Text>

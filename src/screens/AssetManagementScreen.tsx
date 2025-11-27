@@ -138,7 +138,7 @@ export default function AssetManagementScreen({
               currentScreen === "users" && styles.navButtonTextActive,
             ]}
           >
-            👥 Users
+            Users
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
@@ -154,7 +154,7 @@ export default function AssetManagementScreen({
               currentScreen === "assets" && styles.navButtonTextActive,
             ]}
           >
-            🖼️ Assets
+            Assets
           </Text>
         </TouchableOpacity>
       </View>

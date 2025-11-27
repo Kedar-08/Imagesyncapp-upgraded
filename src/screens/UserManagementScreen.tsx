@@ -59,9 +59,14 @@ export default function UserManagementScreen({
 
   const handleDeleteCallback = useCallback(
     (user: StoredUser) => {
-      handleDeleteUser(user, parseInt(currentUser.id, 10), isSuperAdmin);
+      handleDeleteUser(
+        user,
+        parseInt(currentUser.id, 10),
+        currentUser.username,
+        isSuperAdmin
+      );
     },
-    [handleDeleteUser, currentUser.id, isSuperAdmin]
+    [handleDeleteUser, currentUser.id, currentUser.username, isSuperAdmin]
   );
 
   const renderUserItem = ({ item }: { item: StoredUser }) => (
@@ -110,7 +115,7 @@ export default function UserManagementScreen({
                 currentScreen === "users" && styles.navButtonTextActive,
               ]}
             >
-              👥 Users
+              Users
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -126,7 +131,7 @@ export default function UserManagementScreen({
                 currentScreen === "assets" && styles.navButtonTextActive,
               ]}
             >
-              🖼️ Assets
+              Assets
             </Text>
           </TouchableOpacity>
         </View>

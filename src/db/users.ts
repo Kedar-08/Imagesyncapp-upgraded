@@ -151,7 +151,35 @@ export async function getAllUsers(): Promise<StoredUser[]> {
 /**
  * Delete user by ID (admin operation)
  */
-export async function deleteUser(userId: number): Promise<void> {
+export async function deleteUser(
+  userId: number,
+  deletedByAdminId?: number,
+  deletedByAdminUsername?: string
+): Promise<void> {
+  // If admin info provided, record the deletion for audit trail
+  if (deletedByAdminId && deletedByAdminUsername) {
+    const { recordUserDeletion } = await import("./db");
+    const { queryOne } = await import("../utils/dbHelpers");
+
+    // Get user details before deletion
+    const user = await queryOne<{
+      username: string;
+      email: string;
+      role: string;
+    }>(`SELECT username, email, role FROM users WHERE id = ?`, [userId]);
+
+    if (user) {
+      await recordUserDeletion(
+        userId,
+        user.username,
+        user.email,
+        user.role,
+        deletedByAdminId,
+        deletedByAdminUsername
+      );
+    }
+  }
+
   await execSql(`DELETE FROM users WHERE id = ?`, [userId]);
 }
 

@@ -77,7 +77,7 @@ export default function CaptureScreen({
       }
 
       const result = await ImagePicker.launchCameraAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: "images",
         quality: 0.6,
         allowsEditing: false,
       });
@@ -93,7 +93,7 @@ export default function CaptureScreen({
     if (!perm.granted) return;
 
     const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: "images",
       quality: 0.8,
       allowsMultipleSelection: false,
     });

@@ -90,7 +90,7 @@ const UserCard = React.memo(
           )}
 
           {/* Profile Button */}
-          {!isSuperAdminUser && !isCurrentUser && (
+          {!isCurrentUser && (
             <TouchableOpacity
               style={[styles.button, styles.viewButton]}
               onPress={() => onViewProfile(user)}

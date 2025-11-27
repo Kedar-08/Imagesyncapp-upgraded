@@ -16,6 +16,7 @@ interface UseUserManagementReturn {
   handleDeleteUser: (
     user: StoredUser,
     currentUserId: number,
+    currentUsername: string,
     isSuperAdmin: boolean
   ) => void;
 }
@@ -28,7 +29,13 @@ export const useUserManagement = (): UseUserManagementReturn => {
   const loadUsers = useCallback(async () => {
     try {
       const allUsers = await getAllUsers();
-      setUsers(allUsers);
+      // Sort: superadmin first, then alphabetically by username
+      const sortedUsers = allUsers.sort((a, b) => {
+        if (a.role === "superadmin") return -1;
+        if (b.role === "superadmin") return 1;
+        return a.username.toLowerCase().localeCompare(b.username.toLowerCase());
+      });
+      setUsers(sortedUsers);
     } catch (err) {
       console.error("Error loading users:", err);
     } finally {
@@ -40,7 +47,13 @@ export const useUserManagement = (): UseUserManagementReturn => {
     setRefreshing(true);
     try {
       const allUsers = await getAllUsers();
-      setUsers(allUsers);
+      // Sort: superadmin first, then alphabetically by username
+      const sortedUsers = allUsers.sort((a, b) => {
+        if (a.role === "superadmin") return -1;
+        if (b.role === "superadmin") return 1;
+        return a.username.toLowerCase().localeCompare(b.username.toLowerCase());
+      });
+      setUsers(sortedUsers);
     } catch (err) {
       console.error("Error refreshing users:", err);
     } finally {
@@ -156,7 +169,12 @@ export const useUserManagement = (): UseUserManagementReturn => {
   );
 
   const handleDeleteUser = useCallback(
-    (user: StoredUser, currentUserId: number, isSuperAdmin: boolean) => {
+    (
+      user: StoredUser,
+      currentUserId: number,
+      currentUsername: string,
+      isSuperAdmin: boolean
+    ) => {
       // Prevent deletion of current user
       if (user.id === currentUserId) {
         Alert.alert("Cannot Delete", "You cannot delete your own account");
@@ -188,7 +206,7 @@ export const useUserManagement = (): UseUserManagementReturn => {
             text: "Delete",
             onPress: async () => {
               try {
-                await deleteUser(user.id);
+                await deleteUser(user.id, currentUserId, currentUsername);
                 await loadUsers();
                 Alert.alert("Success", `${user.username} has been deleted`);
               } catch (error) {

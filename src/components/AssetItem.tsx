@@ -76,7 +76,7 @@ export default memo(function AssetItem({
               : isFailed
                 ? "✗ Failed"
                 : item.status === "uploaded"
-                  ? "✓ Synced"
+                  ? "Synced"
                   : `Pending`}
           </Text>
           {item.serverId && (
@@ -108,7 +108,7 @@ export default memo(function AssetItem({
             style={buttonStyle("#f44336")}
             onPress={() => onDelete(item.id, item.filename)}
           >
-            <Text style={buttonTextStyle()}>🗑️ Delete</Text>
+            <Text style={buttonTextStyle()}>Delete</Text>
           </TouchableOpacity>
         )}
       </View>

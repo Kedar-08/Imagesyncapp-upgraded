@@ -58,7 +58,7 @@ function AssetCard({ asset, onPreview, onDelete }: AssetCardProps) {
       </View>
 
       <TouchableOpacity style={styles.delete} onPress={() => onDelete(asset)}>
-        <Text style={styles.deleteText}>🗑️</Text>
+        <Text style={styles.deleteText}>Delete</Text>
       </TouchableOpacity>
     </View>
   );

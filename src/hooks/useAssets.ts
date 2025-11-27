@@ -1,4 +1,5 @@
 import { useState, useCallback, useEffect } from "react";
+import { Alert } from "react-native";
 import {
   getAllAssets,
   initializeSchema,
@@ -49,17 +50,34 @@ export function useAssets(
   // Delete asset (with admin tracking if applicable)
   const handleDeleteAsset = useCallback(
     async (assetId: number, filename: string) => {
-      try {
-        if ((isAdmin || isSuperAdmin) && user) {
-          await deleteAsset(assetId, parseInt(user.id, 10), user.username);
-        } else {
-          await deleteAsset(assetId);
-        }
-        await reload();
-      } catch (error) {
-        console.error("Error deleting asset:", error);
-        throw error;
-      }
+      Alert.alert(
+        "Delete Image",
+        `Are you sure you want to delete "${filename}"? This action cannot be undone.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Delete",
+            onPress: async () => {
+              try {
+                if ((isAdmin || isSuperAdmin) && user) {
+                  await deleteAsset(
+                    assetId,
+                    parseInt(user.id, 10),
+                    user.username
+                  );
+                } else {
+                  await deleteAsset(assetId);
+                }
+                await reload();
+              } catch (error) {
+                console.error("Error deleting asset:", error);
+                Alert.alert("Error", "Failed to delete image");
+              }
+            },
+            style: "destructive",
+          },
+        ]
+      );
     },
     [reload, isAdmin, isSuperAdmin, user]
   );
