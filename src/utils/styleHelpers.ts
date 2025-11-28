@@ -290,8 +290,8 @@ export const assetCardStyles = () =>
       height: 40,
       justifyContent: "center",
       alignItems: "center",
-      borderRadius: 4,
-      backgroundColor: "#FFE8E8",
+      borderRadius: 20,
+      backgroundColor: "#F44336",
     },
     deleteText: { fontSize: 18 },
   });

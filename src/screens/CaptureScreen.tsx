@@ -1,14 +1,24 @@
 import React, { useCallback, useState } from "react";
-import { View, FlatList, StyleSheet } from "react-native";
+import { View, FlatList, StyleSheet, Alert, Text } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import type { LocalAssetRecord } from "../types";
 import { useAuth } from "../context/AuthContext";
 import { processAndQueueImage } from "../utils/imageHelpers";
+import {
+  pickDocument,
+  saveAndRecordFile,
+  validateFile,
+} from "../services/FileService";
+import { getQueueManager } from "../services/QueueManager";
 import AssetItem from "../components/AssetItem";
 import ZoomModal from "../components/ZoomModal";
 import CameraModal from "../components/CameraModal";
 import CaptureHeader from "../components/CaptureHeader";
 import { useAssets } from "../hooks/useAssets";
+import { useFiles } from "../hooks/useFiles";
+import FileItem from "../components/FileItem";
+import { openFile } from "../utils/fileHelpers";
+import type { FileRecord } from "../db/db";
 
 interface CaptureScreenProps {
   onNavigateToUsers?: () => void;
@@ -31,6 +41,14 @@ export default function CaptureScreen({
     handleRetry,
     handleDeleteAsset,
   } = useAssets(user, isAdmin, isSuperAdmin);
+
+  const {
+    files,
+    refreshing: filesRefreshing,
+    onRefresh: onRefreshFiles,
+    handleRetryFile,
+    handleDeleteFile,
+  } = useFiles(user, isAdmin, isSuperAdmin);
 
   const [showCamera, setShowCamera] = useState(false);
   const [showZoom, setShowZoom] = useState(false);
@@ -101,6 +119,47 @@ export default function CaptureScreen({
     await handlePickerResult(result);
   }, [handlePickerResult]);
 
+  const handlePickFile = useCallback(async () => {
+    try {
+      const result = await pickDocument();
+
+      if (result.canceled) {
+        return;
+      }
+
+      const asset = result.assets[0];
+
+      // Validate file
+      const validation = validateFile({
+        size: asset.size,
+        name: asset.name,
+      });
+
+      if (!validation.valid) {
+        Alert.alert(
+          "Invalid File",
+          validation.error || "Please select a valid CSV or Excel file"
+        );
+        return;
+      }
+
+      // Save and record file
+      const fileId = await saveAndRecordFile(result, user);
+
+      // Enqueue for upload
+      const queueManager = getQueueManager();
+      await queueManager.enqueueFile(fileId);
+
+      // Refresh file list
+      await onRefreshFiles();
+
+      Alert.alert("Success", "File uploaded successfully and queued for sync");
+    } catch (error) {
+      console.error("File picker error:", error);
+      Alert.alert("Error", "Failed to upload file");
+    }
+  }, [user, onRefreshFiles]);
+
   const handleCameraCapture = useCallback(
     async (cameraRef: any) => {
       try {
@@ -117,6 +176,47 @@ export default function CaptureScreen({
     [onRefresh, user]
   );
 
+  const handleOpenFile = useCallback(
+    async (file: FileRecord) => {
+      if (!file.localUri) {
+        Alert.alert("Error", "File path not found");
+        return;
+      }
+
+      Alert.alert(
+        "File Options",
+        `What would you like to do with ${file.filename}?`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "View/Edit",
+            onPress: async () => {
+              await openFile(file.localUri, file.filename);
+
+              // After opening, offer to re-upload if edited
+              setTimeout(() => {
+                Alert.alert(
+                  "Re-upload File?",
+                  "If you made changes to the file, you can upload a new version.",
+                  [
+                    { text: "No, Thanks", style: "cancel" },
+                    {
+                      text: "Upload New Version",
+                      onPress: async () => {
+                        await handlePickFile();
+                      },
+                    },
+                  ]
+                );
+              }, 2000);
+            },
+          },
+        ]
+      );
+    },
+    [handlePickFile]
+  );
+
   return (
     <View style={styles.container}>
       <CaptureHeader
@@ -130,7 +230,15 @@ export default function CaptureScreen({
         onNavigateToAssets={onNavigateToAssets}
         onCapture={handleCapture}
         onPick={handlePick}
+        onPickFile={handlePickFile}
       />
+
+      {/* Images Section */}
+      {items.length > 0 && (
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Images ({items.length})</Text>
+        </View>
+      )}
 
       <FlatList
         data={items}
@@ -158,6 +266,29 @@ export default function CaptureScreen({
             />
           );
         }}
+        ListFooterComponent={
+          files.length > 0 ? (
+            <>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Files ({files.length})</Text>
+              </View>
+              {files.map((file) => (
+                <FileItem
+                  key={file.id}
+                  file={file}
+                  onPress={handleOpenFile}
+                  onRetry={handleRetryFile}
+                  onDelete={handleDeleteFile}
+                  canDelete={
+                    isAdmin ||
+                    isSuperAdmin ||
+                    file.userId === parseInt(user?.id || "0", 10)
+                  }
+                />
+              ))}
+            </>
+          ) : null
+        }
       />
 
       <CameraModal
@@ -180,5 +311,17 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#fff",
+  },
+  sectionHeader: {
+    backgroundColor: "#F5F5F5",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: "#E0E0E0",
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#424242",
   },
 });

@@ -7,9 +7,16 @@ import {
   markFailed,
   setPending,
   incrementRetryCapped,
+  getPendingFiles,
+  markFileUploaded,
+  markFileFailed,
+  setFilePending,
+  incrementFileRetry,
+  markFileUploading,
 } from "../db/db";
+import type { FileRecord } from "../db/db";
 import { syncEventBus } from "./SyncEventBus";
-import { uploadPhoto } from "../utils/api";
+import { uploadPhoto, uploadFile } from "../utils/api";
 import * as Network from "expo-network";
 import type {
   LocalAssetRecord,
@@ -27,10 +34,13 @@ export class QueueManager {
     this.getInitialMetrics()
   );
   private processingAssets = new Map<number, Promise<void>>();
+  private processingFiles = new Map<number, Promise<void>>();
   private isPaused = false;
   private isProcessing = false;
   private completedCount = 0;
   private failedCount = 0;
+  private fileCompletedCount = 0;
+  private fileFailedCount = 0;
   private uploadTimes: number[] = [];
 
   constructor() {
@@ -55,6 +65,14 @@ export class QueueManager {
     }
   }
 
+  async enqueueFile(fileId: number): Promise<void> {
+    await this.updateMetrics();
+    syncEventBus.emitFileQueued(fileId);
+
+    if (!this.isProcessing && !this.isPaused) {
+      void this.processQueue();
+    }
+  }
   async processQueue(): Promise<void> {
     if (this.isProcessing || this.isPaused) return;
 
@@ -70,9 +88,13 @@ export class QueueManager {
       // Ensure queue is initialized
       await this.initializeQueue();
 
-      let batch = await reservePendingAssets(BATCH_SIZE);
+      let assetBatch = await reservePendingAssets(BATCH_SIZE);
+      let fileBatch = await getPendingFiles(BATCH_SIZE);
 
-      while (batch.length > 0 && !this.isPaused) {
+      while (
+        (assetBatch.length > 0 || fileBatch.length > 0) &&
+        !this.isPaused
+      ) {
         const concurrentCount = this.processingAssets.size;
 
         if (concurrentCount >= MAX_CONCURRENT_UPLOADS) {
@@ -80,16 +102,27 @@ export class QueueManager {
           continue;
         }
 
-        for (const asset of batch) {
+        // Process image assets
+        for (const asset of assetBatch) {
           const promise = this.uploadAsset(asset);
           this.processingAssets.set(asset.id, promise);
           promise.finally(() => this.processingAssets.delete(asset.id));
         }
 
+        // Process files
+        for (const file of fileBatch) {
+          const promise = this.uploadFileItem(file);
+          this.processingAssets.set(`file_${file.id}` as any, promise);
+          promise.finally(() =>
+            this.processingAssets.delete(`file_${file.id}` as any)
+          );
+        }
+
         this.updateMetrics();
         await new Promise((r) => setTimeout(r, 500));
 
-        batch = await reservePendingAssets(BATCH_SIZE);
+        assetBatch = await reservePendingAssets(BATCH_SIZE);
+        fileBatch = await getPendingFiles(BATCH_SIZE);
       }
     } finally {
       this.isProcessing = false;
@@ -119,6 +152,31 @@ export class QueueManager {
     }
   }
 
+  private async uploadFileItem(file: FileRecord): Promise<void> {
+    const startTime = Date.now();
+
+    try {
+      await markFileUploading(file.id);
+      syncEventBus.emitFileUploading(file.id);
+
+      const response = await uploadFile(file);
+
+      if (response.status === "ok") {
+        await markFileUploaded(file.id, response.serverId);
+        const duration = Date.now() - startTime;
+        this.uploadTimes.push(duration);
+        this.fileCompletedCount++;
+        syncEventBus.emitFileUploaded(file.id, response.serverId, duration);
+        await this.updateMetrics();
+      } else {
+        throw new Error("Server returned error status");
+      }
+    } catch (error) {
+      const errorMsg = error instanceof Error ? error.message : String(error);
+      await this.handleFileUploadFailure(file.id, errorMsg);
+    }
+  }
+
   private async handleUploadFailure(
     assetId: number,
     errorMsg: string
@@ -141,6 +199,16 @@ export class QueueManager {
     this.updateMetrics();
   }
 
+  private async handleFileUploadFailure(
+    fileId: number,
+    errorMsg: string
+  ): Promise<void> {
+    await incrementFileRetry(fileId, MAX_RETRIES);
+    this.fileFailedCount++;
+    syncEventBus.emitFileFailed(fileId, errorMsg);
+    this.updateMetrics();
+  }
+
   private async uploadOne(
     asset: LocalAssetRecord
   ): Promise<ServerUploadResponse> {
@@ -159,23 +227,29 @@ export class QueueManager {
   }
 
   private async updateMetrics(): Promise<void> {
-    // Get actual pending count from database
-    const pending = await getPendingAssets(1000).catch(() => []);
-    const totalQueued = pending.length;
+    // Get actual pending count from database (images + files)
+    const pendingAssets = await getPendingAssets(1000).catch(() => []);
+    const pendingFiles = await getPendingFiles(1000).catch(() => []);
+    const totalQueued = pendingAssets.length + pendingFiles.length;
+
+    const totalCompleted = this.completedCount + this.fileCompletedCount;
+    const totalFailed = this.failedCount + this.fileFailedCount;
+    const totalInProgress =
+      this.processingAssets.size + this.processingFiles.size;
 
     const metrics: QueueMetrics = {
       totalQueued,
-      inProgress: this.processingAssets.size,
-      completed: this.completedCount,
-      failed: this.failedCount,
+      inProgress: totalInProgress,
+      completed: totalCompleted,
+      failed: totalFailed,
       averageUploadTime:
         this.uploadTimes.length > 0
           ? this.uploadTimes.reduce((a, b) => a + b, 0) /
             this.uploadTimes.length
           : 0,
       errorRate:
-        this.completedCount + this.failedCount > 0
-          ? this.failedCount / (this.completedCount + this.failedCount)
+        totalCompleted + totalFailed > 0
+          ? totalFailed / (totalCompleted + totalFailed)
           : 0,
       lastSyncTime: Date.now(),
     };

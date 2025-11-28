@@ -1,5 +1,6 @@
 import React from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import type { AssetWithUser } from "../db/db";
 import { formatFileSize } from "../utils/dateHelpers";
 import { assetCardStyles } from "../utils/styleHelpers";
@@ -58,7 +59,7 @@ function AssetCard({ asset, onPreview, onDelete }: AssetCardProps) {
       </View>
 
       <TouchableOpacity style={styles.delete} onPress={() => onDelete(asset)}>
-        <Text style={styles.deleteText}>Delete</Text>
+        <MaterialIcons name="delete" size={24} color="#fff" />
       </TouchableOpacity>
     </View>
   );

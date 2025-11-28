@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from "react-native";
+import { MaterialIcons } from "@expo/vector-icons";
 import type { LocalAssetRecord } from "../types";
 import { buttonStyle, buttonTextStyle } from "../utils/styleHelpers";
 
@@ -105,10 +106,10 @@ export default memo(function AssetItem({
 
         {(isAdmin || isSuperAdmin) && (
           <TouchableOpacity
-            style={buttonStyle("#f44336")}
+            style={[buttonStyle("#f44336"), styles.deleteButton]}
             onPress={() => onDelete(item.id, item.filename)}
           >
-            <Text style={buttonTextStyle()}>Delete</Text>
+            <MaterialIcons name="delete" size={18} color="#fff" />
           </TouchableOpacity>
         )}
       </View>
@@ -168,5 +169,11 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: "#ff9800",
     marginTop: 2,
+  },
+  deleteButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    minWidth: 40,
   },
 });

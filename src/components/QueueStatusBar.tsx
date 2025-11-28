@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { View, Text, StyleSheet, ActivityIndicator } from "react-native";
 import { syncEventBus, type SyncEventPayload } from "../services/SyncEventBus";
 import { getQueueManager } from "../services/QueueManager";
-import { resetFailedAssets } from "../db/db";
+import { resetFailedAssets, resetFailedFiles } from "../db/db";
 import type { QueueMetrics } from "../types";
 import * as Network from "expo-network";
 
@@ -22,6 +22,14 @@ export default function QueueStatusBar() {
       setFailedCount((prev) => prev + 1);
     };
 
+    const handleFileUploaded = (payload: SyncEventPayload) => {
+      setIsSyncing(false);
+    };
+
+    const handleFileFailed = (payload: SyncEventPayload) => {
+      setFailedCount((prev) => prev + 1);
+    };
+
     const handleQueueStarted = (payload: SyncEventPayload) => {
       setIsSyncing(true);
     };
@@ -34,11 +42,18 @@ export default function QueueStatusBar() {
       setIsSyncing(true);
     };
 
+    const handleFileUploading = (payload: SyncEventPayload) => {
+      setIsSyncing(true);
+    };
+
     syncEventBus.onSyncEvent("asset:uploaded", handleAssetUploaded);
     syncEventBus.onSyncEvent("asset:failed", handleAssetFailed);
+    syncEventBus.onSyncEvent("file:uploaded", handleFileUploaded);
+    syncEventBus.onSyncEvent("file:failed", handleFileFailed);
     syncEventBus.onSyncEvent("queue:started", handleQueueStarted);
     syncEventBus.onSyncEvent("queue:completed", handleQueueCompleted);
     syncEventBus.onSyncEvent("asset:uploading", handleAssetUploading);
+    syncEventBus.onSyncEvent("file:uploading", handleFileUploading);
 
     const queueManager = getQueueManager();
     const metricsSubscription = queueManager.getMetrics$().subscribe((m) => {
@@ -54,6 +69,7 @@ export default function QueueStatusBar() {
       // If coming back online from offline, reset failed items and trigger sync
       if (online && wasOffline.current) {
         await resetFailedAssets();
+        await resetFailedFiles();
         setFailedCount(0);
         const queueManager = getQueueManager();
         await queueManager.processQueue();
@@ -70,9 +86,12 @@ export default function QueueStatusBar() {
       clearInterval(networkInterval);
       syncEventBus.offSyncEvent("asset:uploaded", handleAssetUploaded);
       syncEventBus.offSyncEvent("asset:failed", handleAssetFailed);
+      syncEventBus.offSyncEvent("file:uploaded", handleFileUploaded);
+      syncEventBus.offSyncEvent("file:failed", handleFileFailed);
       syncEventBus.offSyncEvent("queue:started", handleQueueStarted);
       syncEventBus.offSyncEvent("queue:completed", handleQueueCompleted);
       syncEventBus.offSyncEvent("asset:uploading", handleAssetUploading);
+      syncEventBus.offSyncEvent("file:uploading", handleFileUploading);
     };
   }, []);
 

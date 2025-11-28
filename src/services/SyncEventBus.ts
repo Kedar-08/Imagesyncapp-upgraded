@@ -9,6 +9,10 @@ export type SyncEventType =
   | "asset:uploaded"
   | "asset:failed"
   | "asset:retrying"
+  | "file:queued"
+  | "file:uploading"
+  | "file:uploaded"
+  | "file:failed"
   | "queue:started"
   | "queue:completed"
   | "network:online"
@@ -16,6 +20,7 @@ export type SyncEventType =
 
 export interface SyncEventPayload {
   assetId?: number;
+  fileId?: number;
   timestamp: number;
   duration?: number;
   error?: string;
@@ -135,6 +140,37 @@ class SyncEventBus {
   emitNetworkOffline(): void {
     this.emit("network:offline", {
       timestamp: Date.now(),
+    });
+  }
+
+  emitFileQueued(fileId: number): void {
+    this.emit("file:queued", {
+      fileId,
+      timestamp: Date.now(),
+    });
+  }
+
+  emitFileUploading(fileId: number): void {
+    this.emit("file:uploading", {
+      fileId,
+      timestamp: Date.now(),
+    });
+  }
+
+  emitFileUploaded(fileId: number, serverId: string, duration: number): void {
+    this.emit("file:uploaded", {
+      fileId,
+      timestamp: Date.now(),
+      serverId,
+      duration,
+    });
+  }
+
+  emitFileFailed(fileId: number, error: string): void {
+    this.emit("file:failed", {
+      fileId,
+      timestamp: Date.now(),
+      error,
     });
   }
 }

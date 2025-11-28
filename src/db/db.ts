@@ -96,6 +96,25 @@ export async function initializeSchema(): Promise<void> {
     )`
   );
 
+  // Create files table for CSV/Excel document management
+  await execSql(
+    `CREATE TABLE IF NOT EXISTS files (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      filename TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      local_uri TEXT NOT NULL,
+      file_size_bytes INTEGER,
+      file_type TEXT NOT NULL,
+      parsed_preview TEXT,
+      status TEXT NOT NULL,
+      retries INTEGER NOT NULL DEFAULT 0,
+      timestamp_ms INTEGER NOT NULL,
+      server_id TEXT,
+      user_id INTEGER,
+      username TEXT
+    )`
+  );
+
   // Migration: Add image columns to deleted_assets if they don't exist
   try {
     await execSql(`ALTER TABLE deleted_assets ADD COLUMN image_base64 TEXT`);
@@ -215,6 +234,13 @@ export async function resetFailedAssets(): Promise<void> {
   // Reset all failed items back to pending with retry count reset
   await execSql(
     `UPDATE assets SET status = 'pending', retries = 0 WHERE status = 'failed'`
+  );
+}
+
+export async function resetFailedFiles(): Promise<void> {
+  // Reset all failed files back to pending with retry count reset
+  await execSql(
+    `UPDATE files SET status = 'pending', retries = 0 WHERE status = 'failed'`
   );
 }
 
@@ -363,6 +389,23 @@ export interface DeletedUserRecord {
   deletionTimestampMs: number;
 }
 
+// File record interface for CSV/Excel documents
+export interface FileRecord {
+  id: number;
+  filename: string;
+  mimeType: string;
+  localUri: string;
+  fileSizeBytes?: number | null;
+  fileType: string; // 'csv' | 'excel'
+  parsedPreview?: string | null; // JSON string of parsed data preview
+  status: "pending" | "uploaded" | "failed" | "uploading";
+  retries: number;
+  timestampMs: number;
+  serverId?: string | null;
+  userId?: number | null;
+  username?: string | null;
+}
+
 export async function getAdminPromotions(
   adminId: number
 ): Promise<AdminPromotion[]> {
@@ -470,4 +513,132 @@ export async function recordAdminPromotion(
       Date.now(),
     ]
   );
+}
+
+// ==================== FILE MANAGEMENT FUNCTIONS ====================
+
+function mapFileRow(row: any): FileRecord {
+  return {
+    id: row.id,
+    filename: row.filename,
+    mimeType: row.mime_type,
+    localUri: row.local_uri,
+    fileSizeBytes: row.file_size_bytes ?? null,
+    fileType: row.file_type,
+    parsedPreview: row.parsed_preview ?? null,
+    status: row.status as "pending" | "uploaded" | "failed" | "uploading",
+    retries: row.retries ?? 0,
+    timestampMs: row.timestamp_ms,
+    serverId: row.server_id ?? null,
+    userId: row.user_id ?? null,
+    username: row.username ?? null,
+  };
+}
+
+export async function insertFile(params: {
+  filename: string;
+  mimeType: string;
+  localUri: string;
+  fileSizeBytes?: number | null;
+  fileType: string;
+  parsedPreview?: string | null;
+  status?: "pending" | "uploaded" | "failed";
+  userId?: number | null;
+  username?: string | null;
+}): Promise<number> {
+  return insertOne(
+    `INSERT INTO files (filename, mime_type, local_uri, file_size_bytes, file_type, parsed_preview, status, retries, timestamp_ms, user_id, username)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      params.filename,
+      params.mimeType,
+      params.localUri,
+      params.fileSizeBytes ?? null,
+      params.fileType,
+      params.parsedPreview ?? null,
+      params.status ?? "pending",
+      0,
+      Date.now(),
+      params.userId ?? null,
+      params.username ?? null,
+    ]
+  );
+}
+
+export async function getAllFiles(): Promise<FileRecord[]> {
+  const rows = await queryAll<any>(`SELECT * FROM files ORDER BY id DESC`);
+  return rows.map(mapFileRow);
+}
+
+export async function getPendingFiles(limit = 5): Promise<FileRecord[]> {
+  const rows = await queryAll<any>(
+    `SELECT * FROM files WHERE status IN ('pending', 'failed') AND retries < 5 ORDER BY id ASC LIMIT ?`,
+    [limit]
+  );
+  return rows.map(mapFileRow);
+}
+
+export async function markFileUploaded(
+  id: number,
+  serverId: string
+): Promise<void> {
+  await execSql(
+    `UPDATE files SET status = 'uploaded', server_id = ? WHERE id = ?`,
+    [serverId, id]
+  );
+}
+
+export async function markFileFailed(id: number): Promise<void> {
+  await execSql(`UPDATE files SET status = 'failed' WHERE id = ?`, [id]);
+}
+
+export async function setFilePending(id: number): Promise<void> {
+  await execSql(`UPDATE files SET status = 'pending' WHERE id = ?`, [id]);
+}
+
+export async function markFileUploading(id: number): Promise<void> {
+  await execSql(`UPDATE files SET status = 'uploading' WHERE id = ?`, [id]);
+}
+
+export async function incrementFileRetry(
+  id: number,
+  maxRetries = 5
+): Promise<void> {
+  await execSql(`UPDATE files SET retries = retries + 1 WHERE id = ?`, [id]);
+
+  const file = await queryOne<{ retries: number }>(
+    `SELECT retries FROM files WHERE id = ?`,
+    [id]
+  );
+
+  if (file && file.retries >= maxRetries) {
+    await markFileFailed(id);
+  } else {
+    await setFilePending(id);
+  }
+}
+
+export async function deleteFile(
+  id: number,
+  deletedByAdminId?: number,
+  deletedByAdminUsername?: string
+): Promise<void> {
+  // Optionally track deletion in audit trail (similar to assets)
+  if (deletedByAdminId && deletedByAdminUsername) {
+    const file = await queryOne<any>(`SELECT * FROM files WHERE id = ?`, [id]);
+    if (file) {
+      // Could add a deleted_files table similar to deleted_assets if needed
+      // For now, just delete directly
+    }
+  }
+
+  await execSql(`DELETE FROM files WHERE id = ?`, [id]);
+}
+
+export async function getFilesByUserId(userId: number): Promise<FileRecord[]> {
+  const rows = await queryAll<any>(
+    `SELECT * FROM files WHERE user_id = ? ORDER BY timestamp_ms DESC`,
+    [userId]
+  );
+  return rows.map(mapFileRow);
 }

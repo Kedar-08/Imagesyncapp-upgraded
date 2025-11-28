@@ -14,6 +14,7 @@ interface Props {
   onNavigateToAssets?: () => void;
   onCapture: () => Promise<void>;
   onPick: () => Promise<void>;
+  onPickFile?: () => Promise<void>;
 }
 
 export default function CaptureHeader({
@@ -27,6 +28,7 @@ export default function CaptureHeader({
   onNavigateToAssets,
   onCapture,
   onPick,
+  onPickFile,
 }: Props) {
   const handleLogout = useCallback(async () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -62,25 +64,40 @@ export default function CaptureHeader({
 
       {/* Action Buttons - Different for Admin and User */}
       {isUser && (
-        <View style={styles.buttonRow}>
-          <TouchableOpacity
-            style={[
-              buttonStyle("#007AFF", 30, 12),
-              { minWidth: 140, alignItems: "center" },
-            ]}
-            onPress={onCapture}
-          >
-            <Text style={buttonTextStyle()}>📷 Camera</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              buttonStyle("#007AFF", 30, 12),
-              { minWidth: 140, alignItems: "center" },
-            ]}
-            onPress={onPick}
-          >
-            <Text style={buttonTextStyle()}>Gallery</Text>
-          </TouchableOpacity>
+        <View>
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[
+                buttonStyle("#007AFF", 30, 12),
+                { minWidth: 140, alignItems: "center" },
+              ]}
+              onPress={onCapture}
+            >
+              <Text style={buttonTextStyle()}>Camera</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                buttonStyle("#007AFF", 30, 12),
+                { minWidth: 140, alignItems: "center" },
+              ]}
+              onPress={onPick}
+            >
+              <Text style={buttonTextStyle()}>Gallery</Text>
+            </TouchableOpacity>
+          </View>
+          {onPickFile && (
+            <View style={[styles.buttonRow, { marginTop: 8 }]}>
+              <TouchableOpacity
+                style={[
+                  buttonStyle("#4CAF50", 30, 12),
+                  { flex: 1, alignItems: "center" },
+                ]}
+                onPress={onPickFile}
+              >
+                <Text style={buttonTextStyle()}>Upload CSV/Excel File</Text>
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
 
